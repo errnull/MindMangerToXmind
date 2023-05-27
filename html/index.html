@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>MMAP转幕布助手</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <script type="text/javascript" src="js/jquery-1.11.1.js"></script>
+  <script type="text/javascript" src="js/bootstrap.js"></script>
+  <script type="text/javascript" src="js/jszip.js"></script>
+  <script type="text/javascript" src="js/html2canvas.min.js"></script>
+  <script type="text/javascript" src="js/FileSaver.js"></script>
+  <link rel="stylesheet" href="css/bootstrap.css" />
+  <style type="text/css">
+    * {
+      margin: 0 auto;
+    }
+
+    body {
+      padding: 10px;
+    }
+
+    .my_cans {
+      overflow-x: scroll;
+      white-space: nowrap;
+    }
+
+    .my_cans div {
+      display: inline-block;
+      margin: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="modal fade" id="loadingModal" backdrop="static" keyboard="false">
+    　　
+    <div
+      style="width: 200px;height:100px; z-index: 20000; position: absolute; text-align: center; left: 50%; top: 50%;margin-left:-100px;margin-top:-10px">
+      　　　　
+      <div class="progress progress-striped active"
+        style="margin-bottom: 0;height:100px;line-height:100px;text-align:center;font-size:large;">
+        <p>正在生成</p>
+      </div>
+      　　
+    </div>
+  </div>
+
+  <script>
+    showLoading = function () {
+      $('#loadingModal').modal({ backdrop: 'static', keyboard: false });
+    }
+    hideLoading = function () {
+      $('#loadingModal').modal('hide');
+    }
+  </script>
+
+  <div class="panel panel-info">
+    <div class="panel-heading">
+      <h3 class="panel-title">Step 1. 上传文件</h3>
+    </div>
+    <div class="panel-body">
+      <form class="form-horizontal" role="form">
+        <div class="form-group">
+          <div class="col-xs-12">
+            <label class="sr-only" for="inputfile">文件输入</label>
+            <input id="file" type="file" />
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="panel panel-warning">
+    <div class="panel-heading">
+      <h3 class="panel-title">Step 2. 点击转换并下载</h3>
+    </div>
+    <div class="panel-body">
+      <form class="form-horizontal" role="form">
+        <div class="form-group">
+          <div class="col-xs-12">
+            <button onclick="formatMmap()" type="button" class="btn btn-success">
+              转换并下载
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="panel panel-danger">
+    <div class="panel-heading">
+      <h3 class="panel-title">提示</h3>
+    </div>
+    <div class="panel-body">
+      <form class="form-horizontal" role="form">
+        <div class="form-group">
+          <div class="col-xs-12">
+            <p>1.本工具旨在将MarginNote导出的mmap思维导图软件转换成可以导入到幕布的Freemind文件</p>
+            <p>2.图片无法导入，源于幕布无法添加外链图片</p>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  Copyright @ Jysir
+  <script type="text/javascript">
+    var isRoot = true;
+    var colorDic = {
+      "#B2B2FE": "purple",
+      "#ADD2FF": "blue",
+      "#FFFFAA": "",
+      "#BEFFBE": "green",
+      "#ADD2FF": "blue",
+      "#FFAABE": "red",
+      "#FFFF00": "yellow",
+      "#00FF00": "green",
+      "#00BEFF": "blue",
+      "#FF0000": "red",
+      "#FF8000": "yellow",
+      "#008040": "green",
+      "#003EB3": "blue",
+      "#CF1B11": "red",
+      "#7F7F7F": "",
+      "#DADADA": "",
+      "#B4B4B4": "",
+      "#C39DE0": "purple"
+    }
+    var title;
+    function formatMmap() {
+      showLoading()
+      isRoot = true
+      var mmap = $("#file").prop("files")[0];
+      // console.log(mmap);
+
+      var file = mmap;
+      var fileReader = new FileReader();
+      fileReader.readAsArrayBuffer(file);
+
+      fileReader.onload = function () {
+        // console.log(fileReader.result.byteLength);
+        var zip = new JSZip();
+        var content = "";
+        zip.loadAsync(fileReader.result).then(function (zip) {
+          zip.files["Document.xml"].async("string").then(function (fileData) {
+            content = fileData;
+            //   console.log(content);
+            var xml = $.parseXML(content);
+            // console.log(xml);
+            var root = $(xml)
+              .children("ap\\:Map")
+              .children("ap\\:OneTopic")
+              .children("ap\\:Topic");
+            // var newRoot = $("<root><map>");
+            var newRoot = document.createElement("root");
+            newRoot.append(document.createElement("map"));
+            console.log(newRoot)
+            buildTree(root, newRoot.children[0]);
+            // console.log(newRoot);
+            // return
+            // console.log(newRoot.html());
+            exportRaw(newRoot.innerHTML)
+            hideLoading()
+          });
+        });
+      };
+    }
+
+    function buildTree(root, newRoot) {
+      // let newTree = $("<node>");
+      let newTree = document.createElement("node");
+
+
+      let color = '#FFFFAA'
+      let text = ""
+
+      if ($(root).children("ap\\:Color").length != 0) {
+        color = $(root).children("ap\\:Color").attr('FillColor')
+        color = "#" + color.substring(2).toUpperCase()
+      }
+      if ($(root).children("ap\\:Text").length != 0) {
+        text = $(root).children("ap\\:Text").attr("PlainText");
+      }
+
+      if (isRoot) {
+        // newTree.attr("ID", "root");
+        newTree.setAttributeNS(null, "ID", "root");
+        isRoot = false;
+        title = text
+      } else newTree.setAttributeNS(null, "ID", genId());
+
+      newTree.setAttributeNS(null, "STYLE", 'FORK');
+
+
+      newTree.setAttributeNS(null, "TEXT", text);
+      let spanClass = colorSpan = ""
+      if (colorDic.hasOwnProperty(color)) {
+        colorSpan = colorDic[color];
+        spanClass = "class=\" text-color-" + colorSpan + "\""
+        // console.log(color, colorSpan, spanClass)
+      }
+      let mubuText = encodeURI("<span " + spanClass + " >" + text + "</span>")
+      newTree.setAttributeNS(null, "_mubu_text", mubuText);
+
+      if ($(root).children("ap\\:SubTopics").length != 0)
+        for (let i = 0; i < $(root).children("ap\\:SubTopics").children("ap\\:Topic").length; i++)
+          buildTree($(root).children("ap\\:SubTopics").children("ap\\:Topic")[i], newTree)
+      newRoot.append(newTree);
+    }
+
+    function genWord(len) {
+      let arr = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+      let str = ""
+
+      for (let i = 0; i < len; i++) {
+        let index = Math.round(Math.random() * (arr.length - 1));
+        str += arr[index];
+      }
+      return str;
+    }
+
+    function genId() {
+      return genWord(8) + '-' + genWord(4) + '-' + genWord(4) + '-' + genWord(4) + '-' + genWord(12)
+    }
+
+    function exportRaw(data) {
+      const name = title + parseInt(new Date().getTime() / 1000) + '.mm';
+      var urlObject = window.URL || window.webkitURL || window;
+      var export_blob = new Blob([data]);
+      var save_link = document.createElementNS('http://www.w3.org/1999/xhtml', 'a');
+      save_link.href = urlObject.createObjectURL(export_blob);
+      save_link.download = name;
+      this.fakeClick(save_link);
+
+    }
+
+    function fakeClick(obj) {
+      var ev = document.createEvent('MouseEvents');
+      ev.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+      obj.dispatchEvent(ev);
+    }
+  </script>
+</body>
+
+</html>
